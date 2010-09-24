@@ -2,7 +2,8 @@
   (:use clojure.test)
   (:require [clj-http.client :as client])
   (:require [clj-http.util :as util])
-  (:import (java.util Arrays)))
+  (:import java.util.Arrays)
+  (:import clj_http.CljHttpException))
 
 (def base-req
   {:scheme "http"
@@ -65,7 +66,12 @@
   (let [client (fn [req] {:status 500})
         e-client (client/wrap-exceptions client)]
     (is (thrown-with-msg? Exception #"500"
-      (e-client {})))))
+      (e-client {})))
+    (try
+      (e-client {})
+      (catch CljHttpException e
+        (is (= :response (:type (.data e))))
+        (is (= 500 (:status (:response (.data e)))))))))
 
 (deftest pass-on-non-exceptional
   (let [client (fn [req] {:status 200})

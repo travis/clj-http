@@ -1,6 +1,7 @@
 (ns clj-http.client
   "Batteries-included HTTP client."
-  (:import (java.net URL))
+  (:import java.net.URL)
+  (:import clj_http.CljHttpException)
   (:require [clojure.contrib.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
@@ -29,7 +30,10 @@
     (let [{:keys [status] :as resp} (client req)]
       (if (unexceptional-status? status)
         resp
-        (throw (Exception. (str status)))))))
+        (throw (CljHttpException.
+                 (str "Response: " status)
+                 {:type :response
+                  :response resp}))))))
 
 
 (defn follow-redirect [client req resp]
@@ -180,10 +184,10 @@
   request
   (-> #'core/request
     wrap-redirects
-    wrap-exceptions
     wrap-decompression
     wrap-input-coercion
     wrap-output-coercion
+    wrap-exceptions
     wrap-query-params
     wrap-basic-auth
     wrap-accept

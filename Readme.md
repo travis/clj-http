@@ -74,6 +74,7 @@ The client in `clj-http.core` makes HTTP requests according to a given Ring requ
 Running the tests:
 
     $ lein deps
+    $ javac src/clj_http/CljHttpException.java -d classes
     $ clj test/server.clj
     $ lein test
 
