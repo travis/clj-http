@@ -28,7 +28,8 @@
 (defn wrap-exceptions [client]
   (fn [req]
     (let [{:keys [status] :as resp} (client req)]
-      (if (unexceptional-status? status)
+      (if (or (not (clojure.core/get req :throw-exceptions true))
+              (unexceptional-status? status))
         resp
         (throw (CljHttpException.
                  (str "Response: " status)
