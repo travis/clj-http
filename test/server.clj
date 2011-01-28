@@ -2,7 +2,10 @@
 (use 'ring.middleware.reload)
 (use 'clj-http.core-test)
 
-(run-jetty
+(comment
+  (run-jetty
   (-> #'handler
-    (wrap-reload ['clj-http.core-test]))
+      (wrap-reload ['clj-http.core-test]))
   {:port 8080})
+
+ )

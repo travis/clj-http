@@ -1,13 +1,11 @@
 (ns clj-http.client
   "Batteries-included HTTP client."
-  (:import (java.net URL))
   (:require [clojure.contrib.string :as str])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
+  (:import (java.net URL)
+	   (org.apache.commons.io IOUtils))
   (:refer-clojure :exclude (get)))
-
-(defn update [m k f & args]
-  (assoc m k (apply f (m k) args)))
 
 (defn if-pos [v]
   (if (and v (pos? v)) v))
@@ -52,24 +50,63 @@
   (fn [req]
     (if (get-in req [:headers "Accept-Encoding"])
       (client req)
-      (let [req-c (update req :headers assoc "Accept-Encoding" "gzip, deflate")
+      (let [req-c (update-in req [:headers] assoc "Accept-Encoding" "gzip, deflate")
             resp-c (client req)]
         (case (get-in resp-c [:headers "Content-Encoding"])
           "gzip"
-            (update resp-c :body util/gunzip)
+	  (update-in resp-c [:body]
+	     (fn [^java.io.InputStream is]
+	       (java.util.zip.GZIPInputStream. is)))
           "deflate"
-            (update resp-c :body util/inflate)
+	  (update-in resp-c [:body]
+		     (fn [^java.io.InputStream is]
+		       (java.util.zip.InflaterInputStream. is)))
           resp-c)))))
 
+(defn- chunk-seq
+  "lazy sequence of input-streams for each of the chunks encoded in the
+   chunk input-stream. Assumes input-stream is using chunked http transport.
+   when-done should be called after elements are consumed, otherwise
+   the http connection is not closed!"
+  [^java.io.InputStream is when-done]
+  (let [when-done #(do (when-done) (.close is))
+	r (-> is java.io.InputStreamReader. java.io.BufferedReader.)]
+    (take-while identity
+      (repeatedly
+       #(let [line (.readLine r)]
+	 (if (or (nil? line) (.isEmpty line)) (do (when-done) nil)
+	     (let [size (Integer/decode (str "0x" line))
+		   char-data (char-array size)]
+	       (if (zero? size) (do (when-done) nil)
+		   (let [read-size (.read r char-data 0 size)]		     
+		     (.readLine r) ;after chunk line terminator
+		     (-> char-data
+			 (String. 0 read-size)
+			 (.getBytes "UTF-8")
+			 java.io.ByteArrayInputStream.))))))))))
 
 (defn wrap-output-coercion [client]
-  (fn [{:keys [as] :as req}]
-    (let [{:keys [body] :as resp} (client req)]
-      (cond
-        (or (nil? body) (= :byte-array as))
-          resp
-        (nil? as)
-          (assoc resp :body (String. #^"[B" body "UTF-8"))))))
+  (fn [{:keys [as,chunked?] :as req
+	:or {as :string chunked? false}}]
+    (let [resp (client req)
+	  {:keys [headers,body,when-done] :or {when-done (constantly nil)}} resp	   
+	  as-fn (fn [^java.io.InputStream is]
+		  (case as 
+		       :byte-array (IOUtils/toByteArray is)
+		       :string (String. (IOUtils/toByteArray is) "UTF-8")))]
+      (when chunked?
+	(assert (= (clojure.core/get headers "transfer-encoding") "chunked")))
+      (-> resp 
+       (update-in  [:body]
+	 (fn [is]
+	   (if (not (instance? java.io.InputStream is))
+	     is
+	     (if chunked?
+	      (map as-fn (chunk-seq is when-done))
+	      (let [r (as-fn is)]
+		(when-done)
+		r)))))
+       (dissoc :when-done)))))
 
 
 (defn wrap-input-coercion [client]
@@ -92,7 +129,6 @@
                         (content-type-value content-type))))
       (client req))))
 
-
 (defn wrap-accept [client]
   (fn [{:keys [accept] :as req}]
     (if accept
@@ -100,7 +136,6 @@
                       (assoc-in [:headers "Accept"]
                         (content-type-value accept))))
       (client req))))
-
 
 (defn accept-encoding-value [accept-encoding]
   (str/join ", " (map name accept-encoding)))
@@ -112,7 +147,6 @@
                       (assoc-in [:headers "Accept-Encoding"]
                         (accept-encoding-value accept-encoding))))
       (client req))))
-
 
 (defn generate-query-string [params]
   (str/join "&"
@@ -128,7 +162,6 @@
                              (generate-query-string query-params))))
       (client req))))
 
-
 (defn basic-auth-value [user password]
   (str "Basic "
        (util/base64-encode (util/utf8-bytes (str user ":" password)))))
@@ -141,7 +174,6 @@
                         (basic-auth-value user password))))
       (client req))))
 
-
 (defn wrap-method [client]
   (fn [req]
     (if-let [m (:method req)]
@@ -149,13 +181,11 @@
                       (assoc :request-method m)))
       (client req))))
 
-
 (defn wrap-url [client]
   (fn [req]
     (if-let [url (:url req)]
       (client (-> req (dissoc :url) (merge (parse-url url))))
       (client req))))
-
 
 (def #^{:doc
   "Executes the HTTP request corresponding to the given map and returns the

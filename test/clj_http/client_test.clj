@@ -1,8 +1,10 @@
 (ns clj-http.client-test
-  (:use clojure.test)
-  (:require [clj-http.client :as client])
-  (:require [clj-http.util :as util])
+  (:use clojure.test) 
+  (:require [clj-http.client :as client]
+	    [clj-http.util :as util]
+	    [clojure.contrib.io  :as io])
   (:import (java.util Arrays)))
+
 
 (def base-req
   {:scheme "http"
@@ -75,18 +77,23 @@
 
 
 (deftest apply-on-compressed
-  (let [client (fn [req] {:body (util/gzip (util/utf8-bytes "foofoofoo"))
+  (let [client (fn [req] {:body (-> "foofoofoo"
+				    .getBytes
+				    util/gzip
+				    java.io.ByteArrayInputStream.)
                           :headers {"Content-Encoding" "gzip"}})
         c-client (client/wrap-decompression client)
         resp (c-client {})]
-    (is (= "foofoofoo" (util/utf8-string (:body resp))))))
+    (is (= "foofoofoo" (-> resp :body  io/slurp*)))))
 
 (deftest apply-on-deflated
-  (let [client (fn [req] {:body (util/deflate (util/utf8-bytes "barbarbar"))
+  (let [client (fn [req] {:body (-> "barbarbar" .getBytes
+				    util/deflate
+				    java.io.ByteArrayInputStream.)
                           :headers {"Content-Encoding" "deflate"}})
         c-client (client/wrap-decompression client)
         resp (c-client {})]
-    (is (= "barbarbar" (util/utf8-string (:body resp))))))
+    (is (= "barbarbar" (io/slurp* (:body resp))))))
 
 (deftest pass-on-non-compressed
   (let [c-client (client/wrap-decompression (fn [req] {:body "foo"}))
@@ -115,7 +122,7 @@
 
 
 (deftest apply-on-output-coercion
-  (let [client (fn [req] {:body (util/utf8-bytes "foo")})
+  (let [client (fn [req] {:body (io/input-stream (.getBytes "foo"))})
         o-client (client/wrap-output-coercion client)
         resp (o-client {:uri "/foo"})]
     (is (= "foo" (:body resp)))))
@@ -199,3 +206,14 @@
   (let [u-client (client/wrap-url identity)
         resp (u-client {:uri "/foo"})]
     (is (= "/foo" (:uri resp)))))
+
+
+(deftest chunked-request-test
+  (let [client (fn [req]
+		 {:body (-> "1\r\na\r\n3\r\nfoor\r\n0\r\n\r\n"
+			    .getBytes
+			    io/input-stream)
+		  :headers {"transfer-encoding" "chunked"}})
+	o-client (client/wrap-output-coercion client)
+	resp (o-client {:chunked? true})]
+    (is (= ["a" "foo"] (:body resp)))))
