@@ -15,7 +15,7 @@
   (let [resp (client/request (merge base-req {:uri "/get" :method :get}))]
     (is (= 200 (:status resp)))
     (is (= "close" (get-in resp [:headers "connection"])))
-    (is (= "get\n" (:body resp)))))
+    (is (= "get" (:body resp)))))
 
 
 (defn is-passed [middleware req]
@@ -74,6 +74,12 @@
         e-client (client/wrap-exceptions client)
         resp (e-client {})]
     (is (= 200 (:status resp)))))
+
+(deftest pass-on-exceptional-when-surpressed
+  (let [client (fn [req] {:status 500})
+        e-client (client/wrap-exceptions client)
+        resp (e-client {:throw-exceptions false})]
+    (is (= 500 (:status resp)))))
 
 
 (deftest apply-on-compressed

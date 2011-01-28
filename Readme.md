@@ -61,7 +61,7 @@ The client transparently accepts and decompresses the `gzip` and `deflate` conte
 `clj-http` is available as a Maven artifact from [Clojars](http://clojars.org/clj-http):
 
     :dependencies
-      [[clj-http "0.1.1"] ...]
+      [[clj-http "0.1.2"] ...]
 
 ## Design
 
@@ -71,10 +71,10 @@ The client in `clj-http.core` makes HTTP requests according to a given Ring requ
 
 ## Development
 
-Running the tests:
+To run the tests:
 
     $ lein deps
-    $ clj test/server.clj
+    $ lein run -m clj-http.run-server
     $ lein test
 
 ## License

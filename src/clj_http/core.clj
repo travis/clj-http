@@ -20,8 +20,7 @@
     (try
       (-> http-client
         (.getParams)
-        (.setParameter ClientPNames/COOKIE_POLICY
-                      CookiePolicy/BROWSER_COMPATIBILITY))
+        (.setParameter ClientPNames/COOKIE_POLICY CookiePolicy/BROWSER_COMPATIBILITY))
       (let [http-url (str scheme "://" server-name
                           (if server-port (str ":" server-port))
                           uri
@@ -33,14 +32,14 @@
                          :put    (HttpPut. http-url)
                          :post   (HttpPost. http-url)
                          :delete (HttpDelete. http-url))]
-        (doseq [[header-n header-v] headers]
-          (.addHeader http-req header-n header-v))
         (if (and content-type character-encoding)
           (.addHeader http-req "Content-Type"
                       (str content-type "; charset=" character-encoding)))
         (if (and content-type (not character-encoding))
           (.addHeader http-req "Content-Type" content-type))
         (.addHeader http-req "Connection" "close")
+        (doseq [[header-n header-v] headers]
+          (.addHeader http-req header-n header-v))
         (if body
           (let [http-body (ByteArrayEntity. body)]
             (.setEntity ^HttpEntityEnclosingRequest http-req http-body)))
