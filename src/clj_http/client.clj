@@ -77,14 +77,12 @@
        #(let [line (.readLine r)]
 	 (if (or (nil? line) (.isEmpty line)) (do (when-done) nil)
 	     (let [size (Integer/decode (str "0x" line))
-		   char-data (char-array size)]
-	       (if (zero? size) (do (when-done) nil)
-		   (let [read-size (.read r char-data 0 size)]		     
-		     (.readLine r) ;after chunk line terminator
-		     (-> char-data
-			 (String. 0 read-size)
-			 (.getBytes "UTF-8")
-			 java.io.ByteArrayInputStream.))))))))))
+		   char-data (util/read-bytes r size)]	       
+	       (if (zero? size)
+		 (do (when-done) nil)
+		 (let [chunk (String. char-data 0 size)]
+		   (.readLine r) ;after chunk line terminator
+		   (-> (.getBytes chunk "UTF-8") java.io.ByteArrayInputStream.))))))))))
 
 (defn wrap-output-coercion [client]
   (fn [{:keys [as,chunked?] :as req

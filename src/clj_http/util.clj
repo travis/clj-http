@@ -50,3 +50,13 @@
   "Returns a deflate'd version of the given byte array."
   [b]
   (IOUtils/toByteArray (DeflaterInputStream. (ByteArrayInputStream. b))))
+
+(defn read-bytes [^java.io.Reader r num-chars]
+  (let [chars (char-array num-chars)]
+    (loop [total-num-read 0]
+      (if (= total-num-read num-chars) chars
+	  (let [num-left (- num-chars total-num-read)
+		num-read (.read r chars total-num-read num-left)]
+	  (when (< num-read 0)
+	    (throw (RuntimeException. "Failed to read from reader")))
+	  (recur (+ total-num-read num-read)))))))
