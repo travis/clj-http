@@ -1,4 +1,4 @@
-(defproject clj-http "0.1.2-SNAPSHOT-CHUNK"
+(defproject woven/clj-http "0.1.2-SNAPSHOT"
   :description "A Clojure HTTP library wrapping the Apache HttpComponents client."
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]
@@ -10,3 +10,4 @@
                      [ring/ring-devel "0.3.5"]]
   :repositories {"snapshots" "http://mvn.getwoven.com/repos/woven-public-snapshots"
                  "releases" "http://mvn.getwoven.com/repos/woven-public-releases"})
+
