@@ -2,6 +2,8 @@
   "Batteries-included HTTP client."
   (:import (java.net URL))
   (:require [clojure.contrib.string :as str])
+  (:require [clojure.java.io :as io])
+  (:require [clojure.contrib.io :as cio])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
   (:refer-clojure :exclude (get)))
@@ -67,18 +69,35 @@
   (fn [{:keys [as] :as req}]
     (let [{:keys [body] :as resp} (client req)]
       (cond
-        (or (nil? body) (= :byte-array as))
-          resp
-        (nil? as)
-          (assoc resp :body (String. #^"[B" body "UTF-8"))))))
+       (or (nil? body) (= :stream as))
+         resp
+       (= :byte-array as)
+         (assoc resp :body (cio/to-byte-array body))
+       (nil? as)
+         (assoc resp :body (slurp body))))))
+
+
+(defprotocol InputCoercible [body]
+  (input-coerce ^"[B" [this req]))
+
+(extend-protocol InputCoercible
+  (Class/forName "[B")
+  (input-coerce [array req]
+                (assoc req
+                  :body (io/input-stream array)
+                  :content-length (count array)))
+  String
+  (input-coerce [string req] (assoc (input-coerce (util/utf8-bytes string) req)
+                               :character-encoding "UTF-8"))
+  java.io.InputStream
+  (input-coerce [s req] (assoc req :body s))
+  nil
+  (input-coerce [n req] (assoc req :body n)))
 
 
 (defn wrap-input-coercion [client]
   (fn [{:keys [body] :as req}]
-    (if (string? body)
-      (client (-> req (assoc :body (util/utf8-bytes body)
-                             :character-encoding "UTF-8")))
-      (client req))))
+    (client (input-coerce body req))))
 
 
 (defn content-type-value [type]

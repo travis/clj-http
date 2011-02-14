@@ -1,6 +1,7 @@
 (ns clj-http.client-test
   (:use clojure.test)
   (:use [clj-http.core-test :only [run-server]] )
+  (:require [clojure.java.io :as io])
   (:require [clj-http.client :as client])
   (:require [clj-http.util :as util])
   (:import (java.util Arrays)))
@@ -123,7 +124,7 @@
 
 
 (deftest apply-on-output-coercion
-  (let [client (fn [req] {:body (util/utf8-bytes "foo")})
+  (let [client (fn [req] {:body (io/input-stream (util/utf8-bytes "foo"))})
         o-client (client/wrap-output-coercion client)
         resp (o-client {:uri "/foo"})]
     (is (= "foo" (:body resp)))))
@@ -135,7 +136,7 @@
     (is (nil? (:body resp))))
   (let [client (fn [req] {:body :thebytes})
         o-client (client/wrap-output-coercion client)
-        resp (o-client {:uri "/foo" :as :byte-array})]
+        resp (o-client {:uri "/foo" :as :stream})]
     (is (= :thebytes (:body resp)))))
 
 
@@ -143,11 +144,11 @@
   (let [i-client (client/wrap-input-coercion identity)
         resp (i-client {:body "foo"})]
     (is (= "UTF-8" (:character-encoding resp)))
-    (is (Arrays/equals (util/utf8-bytes "foo") (:body resp)))))
+    (is (= "foo" (slurp (:body resp))))))
 
 (deftest pass-on-no-input-coercion
   (is-passed client/wrap-input-coercion
-    {:body (util/utf8-bytes "foo")}))
+     {:body (io/input-stream (util/utf8-bytes "foo"))}))
 
 
 (deftest apply-on-content-type

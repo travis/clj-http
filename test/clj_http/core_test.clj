@@ -1,7 +1,7 @@
 (ns clj-http.core-test
   (:use clojure.test)
   (:require [clojure.contrib.pprint :as pp])
-  (:require [clojure.contrib.io :as io])
+  (:require [clojure.java.io :as io])
   (:require [clj-http.core :as core])
   (:require [clj-http.util :as util])
   (:require [ring.adapter.jetty :as ring]))
@@ -19,14 +19,17 @@
     [:get "/header"]
       {:status 200 :body (get-in req [:headers "x-my-header"])}
     [:post "/post"]
-      {:status 200 :body (io/slurp* (:body req))}
+      {:status 200 :body (slurp (:body req))}
     [:get "/error"]
       {:status 500 :body "o noes"}))
 
 (defn run-server
   []
   (defonce server
-    (future (ring/run-jetty handler {:port 18080}))))
+    (try
+      (future (ring/run-jetty #'handler {:port 18080}))
+      (catch Exception e
+        (println "Could not start the test server - assuming it was started separately and continuing.")))))
 
 (def base-req
   {:scheme "http"
@@ -37,7 +40,7 @@
   (core/request (merge base-req req)))
 
 (defn slurp-body [req]
-  (io/slurp* (:body req)))
+  (slurp (:body req)))
 
 (deftest ^{:integration true} makes-get-request
   (run-server)
@@ -69,10 +72,10 @@
                        :headers {"X-My-Header" "header-val"}})]
     (is (= "header-val" (slurp-body resp)))))
 
-(deftest ^{:integration true} sends-and-returns-byte-array-body
+(deftest ^{:integration true} sends-and-returns-stream-body
   (run-server)
   (let [resp (request {:request-method :post :uri "/post"
-                       :body (util/utf8-bytes "contents")})]
+                       :body (io/input-stream (util/utf8-bytes "contents"))})]
     (is (= 200 (:status resp)))
     (is (= "contents" (slurp-body resp)))))
 
